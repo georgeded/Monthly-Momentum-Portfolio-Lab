@@ -20,3 +20,11 @@ def momentum(prices: pd.DataFrame, as_of, lookback_months=12, skip_months=1) -> 
     mom = recent / old - 1.0
     mom[(old <= 0) | old.isna() | recent.isna()] = np.nan
     return mom
+
+
+def volatility(returns: pd.DataFrame, as_of, window=TRADING_DAYS, min_periods=126) -> pd.Series:
+    """Annualized volatility of daily returns over the trailing window."""
+    recent = returns.loc[:pd.Timestamp(as_of)].tail(window)
+    vol = recent.std(ddof=1) * np.sqrt(TRADING_DAYS)
+    vol[recent.count() < min_periods] = np.nan
+    return vol
