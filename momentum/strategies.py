@@ -37,3 +37,28 @@ def apply_floor(weights: pd.Series, min_weight: float) -> pd.Series:
     if min_weight <= 0:
         return w / w.sum()
     return min_weight + (1.0 - n * min_weight) * w / w.sum()
+
+
+def apply_cap(weights: pd.Series, cap: float, tol=1e-12) -> pd.Series:
+    """Cap each weight and hand the excess to the uncapped names pro rata.
+
+    When the cap cannot hold everything (too few assets), each asset gets the
+    cap and the rest is left for cash.
+    """
+    w = weights.clip(lower=0.0).astype(float)
+    if w.sum() <= 0:
+        return w
+    w = w / w.sum()
+    if (w > 0).sum() * cap < 1.0 - tol:
+        return (w > 0).astype(float) * cap
+    for _ in range(len(w)):
+        over = w > cap + tol
+        if not over.any():
+            break
+        excess = float((w[over] - cap).sum())
+        w[over] = cap
+        room = (w < cap - tol) & (w > 0)
+        if not room.any():
+            break
+        w[room] += excess * w[room] / w[room].sum()
+    return w
