@@ -62,3 +62,12 @@ def apply_cap(weights: pd.Series, cap: float, tol=1e-12) -> pd.Series:
             break
         w[room] += excess * w[room] / w[room].sum()
     return w
+
+
+def tsmom(prices, returns, as_of, params: Params) -> pd.Series:
+    """Positive 12-1 momentum divided by volatility, with a floor and a cap."""
+    mom = momentum(prices, as_of, params.lookback_months, params.skip_months)
+    vol = volatility(returns, as_of, params.vol_window, params.vol_min_periods)
+    scores = (mom.clip(lower=0.0) / vol.where(vol > 0)).fillna(0.0)
+    w = apply_floor(normalize(scores), params.min_weight)
+    return apply_cap(w, params.max_weight)
