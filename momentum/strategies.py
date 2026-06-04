@@ -100,3 +100,15 @@ LABELS = {
     "inverse_vol": "Inverse volatility",
     "momentum_only": "Momentum only",
 }
+
+
+def allocate(name: str, prices, returns, as_of, active: list, params: Params) -> pd.Series:
+    """Weights for the active assets plus cash, indexed by every price column."""
+    weights = pd.Series(0.0, index=list(prices.columns) + [CASH])
+    if not active:
+        weights[CASH] = 1.0
+        return weights
+    w = STRATEGIES[name](prices[active], returns[active], as_of, params)
+    weights[active] = w.reindex(active).fillna(0.0).values
+    weights[CASH] = max(0.0, 1.0 - float(weights[active].sum()))
+    return weights
