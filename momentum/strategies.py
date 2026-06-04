@@ -71,3 +71,32 @@ def tsmom(prices, returns, as_of, params: Params) -> pd.Series:
     scores = (mom.clip(lower=0.0) / vol.where(vol > 0)).fillna(0.0)
     w = apply_floor(normalize(scores), params.min_weight)
     return apply_cap(w, params.max_weight)
+
+
+def equal_weight(prices, returns, as_of, params: Params) -> pd.Series:
+    return pd.Series(1.0 / prices.shape[1], index=prices.columns)
+
+
+def inverse_vol(prices, returns, as_of, params: Params) -> pd.Series:
+    vol = volatility(returns, as_of, params.vol_window, params.vol_min_periods)
+    return apply_floor(normalize(1.0 / vol.where(vol > 0)), params.min_weight)
+
+
+def momentum_only(prices, returns, as_of, params: Params) -> pd.Series:
+    mom = momentum(prices, as_of, params.lookback_months, params.skip_months)
+    return apply_floor(normalize(mom), params.min_weight)
+
+
+STRATEGIES = {
+    "tsmom": tsmom,
+    "equal_weight": equal_weight,
+    "inverse_vol": inverse_vol,
+    "momentum_only": momentum_only,
+}
+
+LABELS = {
+    "tsmom": "TSMOM",
+    "equal_weight": "Equal weight",
+    "inverse_vol": "Inverse volatility",
+    "momentum_only": "Momentum only",
+}
