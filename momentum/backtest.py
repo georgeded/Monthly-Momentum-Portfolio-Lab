@@ -37,3 +37,22 @@ def rebalance_dates(index, start, end=None, day=None) -> pd.DatetimeIndex:
         elif not dates:
             dates.append(month.iloc[0])
     return pd.DatetimeIndex(dates)
+
+
+def active_assets(prices: pd.DataFrame, as_of, min_history_months=13, min_days=126) -> list:
+    """Assets with enough history on `as_of` to compute their signals."""
+    cutoff = pd.Timestamp(as_of) - pd.DateOffset(months=min_history_months)
+    active = []
+    for col in prices.columns:
+        s = prices[col].loc[:pd.Timestamp(as_of)].dropna()
+        if not s.empty and s.index[0] <= cutoff and len(s) >= min_days:
+            active.append(col)
+    return active
+
+
+def target_weights(strategy, prices, as_of, params=Params(), min_history_months=13) -> pd.Series:
+    """Weights a strategy would set on `as_of`, using only prices up to that day."""
+    past = prices.loc[:pd.Timestamp(as_of)]
+    returns = past.pct_change()
+    active = active_assets(past, as_of, min_history_months, params.vol_min_periods)
+    return allocate(strategy, past, returns, as_of, active, params)
