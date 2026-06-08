@@ -56,3 +56,61 @@ def target_weights(strategy, prices, as_of, params=Params(), min_history_months=
     returns = past.pct_change()
     active = active_assets(past, as_of, min_history_months, params.vol_min_periods)
     return allocate(strategy, past, returns, as_of, active, params)
+
+
+def cash_returns_from_rate(index, annual_rate: float) -> pd.Series:
+    daily = (1.0 + annual_rate) ** (1.0 / TRADING_DAYS) - 1.0
+    return pd.Series(daily, index=index)
+
+
+def run(strategy, prices: pd.DataFrame, start, end=None, rebalance_day=None,
+        params=Params(), cash_returns: pd.Series | None = None, min_history_months=13) -> Result:
+    """Rebalance monthly from `start` and hold the weights, letting them drift, until the next date.
+
+    Signals on a rebalance date use prices up to and including that close.
+    """
+    prices = prices.sort_index()
+    end = pd.Timestamp(end or prices.index.max())
+    dates = rebalance_dates(prices.index, start, end, rebalance_day)
+    if dates.empty:
+        raise ValueError("No trading days between the start and end dates")
+    if cash_returns is None:
+        cash_returns = cash_returns_from_rate(prices.index, 0.0)
+    cash_returns = cash_returns.reindex(prices.index).fillna(0.0)
+    returns = prices.pct_change()
+    cols = list(prices.columns)
+
+    weights, periods, paths, turnover = {}, {}, [], {}
+    value = 1.0
+    drifted = None
+    stops = list(dates[1:]) + ([end] if end > dates[-1] else [])
+    for i, d in enumerate(dates):
+        active = active_assets(prices.loc[:d], d, min_history_months, params.vol_min_periods)
+        w = allocate(strategy, prices.loc[:d], returns.loc[:d], d, active, params)
+        weights[d] = w
+        if drifted is not None:
+            turnover[d] = 0.5 * float((w - drifted).abs().sum())
+        if i >= len(stops):
+            break
+
+        stop = stops[i]
+        window = prices.loc[d:stop, cols].ffill()
+        growth = window / price_asof(prices, d)[cols]
+        cash_growth = (1.0 + cash_returns.loc[d:stop].iloc[1:]).cumprod().reindex(window.index).fillna(1.0)
+        held = growth.fillna(1.0).mul(w[cols]).sum(axis=1) + w[CASH] * cash_growth
+        paths.append(held.iloc[1:] * value if paths else held * value)
+        periods[stop] = float(held.iloc[-1] - 1.0)
+        value *= float(held.iloc[-1])
+
+        end_weights = pd.concat([growth.iloc[-1].fillna(1.0) * w[cols], pd.Series({CASH: w[CASH] * cash_growth.iloc[-1]})])
+        drifted = end_weights / end_weights.sum()
+
+    frame = pd.DataFrame(weights).T
+    frame.index.name = "rebalance_date"
+    path = pd.concat(paths) if paths else pd.Series([1.0], index=[dates[0]])
+    return Result(
+        weights=frame,
+        period_returns=pd.Series(periods, name="return"),
+        value=path.rename("value"),
+        turnover=pd.Series(turnover, name="turnover", dtype=float),
+    )
