@@ -54,3 +54,19 @@ def cvar(returns: pd.Series, alpha=0.05) -> float:
         return np.nan
     tail = r[r <= r.quantile(alpha)]
     return float(tail.mean())
+
+
+def summarize(result, rf_annual=0.0) -> dict:
+    """Headline numbers for a backtest result. Max drawdown uses the daily value path."""
+    r = result.period_returns
+    return {
+        "cumulative_return": cumulative_return(r),
+        "annualized_return": annualized_return(r),
+        "annualized_volatility": annualized_volatility(r),
+        "sharpe": sharpe_ratio(r, rf_annual),
+        "sortino": sortino_ratio(r, rf_annual),
+        "max_drawdown": max_drawdown(result.value),
+        "cvar_5": cvar(r),
+        "avg_turnover": float(result.turnover.mean()) if len(result.turnover) else 0.0,
+        "periods": int(r.dropna().shape[0]),
+    }

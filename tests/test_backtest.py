@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from momentum import metrics
 from momentum.backtest import active_assets, rebalance_dates, run, target_weights
 
 
@@ -51,3 +52,10 @@ def test_equal_weight_drifts_between_rebalances(prices):
     window = prices.loc[first:second]
     expected = (window.iloc[-1] / window.iloc[0]).mean()
     assert np.isclose(res.value.loc[second], expected)
+
+
+def test_metrics_on_a_known_series():
+    r = pd.Series([0.01] * 12)
+    assert np.isclose(metrics.annualized_return(r), 1.01 ** 12 - 1)
+    value = pd.Series([1.0, 1.2, 0.9, 1.1])
+    assert np.isclose(metrics.max_drawdown(value), 0.9 / 1.2 - 1)
