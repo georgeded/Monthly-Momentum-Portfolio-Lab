@@ -38,3 +38,19 @@ def sortino_ratio(returns: pd.Series, rf_annual=0.0, periods_per_year=MONTHS_PER
     if downside == 0:
         return np.nan
     return (annualized_return(r, periods_per_year) - rf_annual) / downside
+
+
+def drawdown(value: pd.Series) -> pd.Series:
+    return value / value.cummax() - 1.0
+
+
+def max_drawdown(value: pd.Series) -> float:
+    return float(drawdown(value).min()) if len(value) else np.nan
+
+
+def cvar(returns: pd.Series, alpha=0.05) -> float:
+    r = returns.dropna()
+    if r.empty:
+        return np.nan
+    tail = r[r <= r.quantile(alpha)]
+    return float(tail.mean())
