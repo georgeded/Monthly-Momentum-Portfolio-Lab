@@ -1,0 +1,16 @@
+{
+  "description": "Basket picked by the desk's analysts for the June 2026 allocation.",
+  "decision_date": "2026-06-15",
+  "assets": [
+    {"ticker": "ONTO", "name": "Onto Innovation", "asset_class": "Equity"},
+    {"ticker": "AVB", "name": "AvalonBay Communities", "asset_class": "Equity"},
+    {"ticker": "UEC", "name": "Uranium Energy Corp", "asset_class": "Equity"},
+    {"ticker": "VRTX", "name": "Vertex Pharmaceuticals", "asset_class": "Equity"},
+    {"ticker": "APO", "name": "Apollo Global Management", "asset_class": "Equity"},
+    {"ticker": "SGLD.L", "name": "Invesco Physical Gold ETC", "asset_class": "Commodity"},
+    {"ticker": "SOYB.L", "name": "WisdomTree Soybeans ETC", "asset_class": "Commodity"},
+    {"ticker": "SIVR", "name": "abrdn Physical Silver Shares ETF", "asset_class": "Commodity"},
+    {"ticker": "URNM", "name": "Sprott Uranium Miners ETF", "asset_class": "Commodity"},
+    {"ticker": "DBB", "name": "Invesco DB Base Metals Fund", "asset_class": "Commodity"}
+  ]
+}
