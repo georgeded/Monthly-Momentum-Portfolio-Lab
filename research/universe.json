@@ -1,14 +1,19 @@
 {
   "description": "Basket picked by the desk's analysts for the June 2026 allocation.",
   "decision_date": "2026-06-15",
+  "first_month_end": "2026-07-15",
   "assets": [
     {"ticker": "ONTO", "name": "Onto Innovation", "asset_class": "Equity"},
-    {"ticker": "AVB", "name": "AvalonBay Communities", "asset_class": "Equity"},
+    {"ticker": "AVB", "name": "AvalonBay Communities", "asset_class": "Equity",
+     "first_month_source": "ESS",
+     "note": "AVB prices after June 15 are no longer available. Essex Property Trust, another coastal apartment REIT, stands in for the first month (daily correlation with AVB 0.88 over the two years to June 15)."},
     {"ticker": "UEC", "name": "Uranium Energy Corp", "asset_class": "Equity"},
     {"ticker": "VRTX", "name": "Vertex Pharmaceuticals", "asset_class": "Equity"},
     {"ticker": "APO", "name": "Apollo Global Management", "asset_class": "Equity"},
     {"ticker": "SGLD.L", "name": "Invesco Physical Gold ETC", "asset_class": "Commodity"},
-    {"ticker": "SOYB.L", "name": "WisdomTree Soybeans ETC", "asset_class": "Commodity"},
+    {"ticker": "SOYB.L", "name": "WisdomTree Soybeans ETC", "asset_class": "Commodity",
+     "first_month_source": "SOYB",
+     "note": "SOYB.L prices after June 15 are no longer available. The US-listed Teucrium Soybean Fund stands in for the first month (weekly correlation with SOYB.L 0.92 over the two years to June 15)."},
     {"ticker": "SIVR", "name": "abrdn Physical Silver Shares ETF", "asset_class": "Commodity"},
     {"ticker": "URNM", "name": "Sprott Uranium Miners ETF", "asset_class": "Commodity"},
     {"ticker": "DBB", "name": "Invesco DB Base Metals Fund", "asset_class": "Commodity"}
