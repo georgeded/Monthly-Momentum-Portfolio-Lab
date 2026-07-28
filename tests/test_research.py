@@ -30,3 +30,11 @@ def test_frozen_data_ends_on_the_decision_date(frozen):
     universe = json.loads((ROOT / "universe.json").read_text())
     assert frozen.index[-1] == pd.Timestamp(universe["decision_date"])
     assert list(frozen.columns) == [a["ticker"] for a in universe["assets"]]
+
+
+def test_first_month_covers_every_asset():
+    month = pd.read_csv(ROOT / "data" / "first_month.csv", index_col="date", parse_dates=True)
+    universe = json.loads((ROOT / "universe.json").read_text())
+    assert month.index[0] == pd.Timestamp(universe["decision_date"])
+    assert month.index[-1] == pd.Timestamp(universe["first_month_end"])
+    assert month.notna().all().all()
