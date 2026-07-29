@@ -10,6 +10,7 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.dates  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
@@ -114,6 +115,7 @@ def figures(results, allocation, month_paths):
                 lw=1.8 if name == "tsmom" else 1.1, ls="--" if name == "SPY" else "-")
     ax.set_title("First month in practice, 2026-06-15 to 2026-07-15")
     ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
+    ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%b %d"))
     ax.axhline(0, color="#9ca3af", lw=0.8)
     ax.legend(frameon=False)
     ax.grid(alpha=0.25)
