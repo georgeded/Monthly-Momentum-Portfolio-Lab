@@ -1,8 +1,8 @@
 # Desk study: monthly momentum allocation, June 2026
 
-This folder is the research record for the allocation the desk set on 15 June 2026.
-The data is frozen so the decision can be reproduced exactly. The first month will
-be reviewed on 15 July.
+This folder is the research record. It is frozen: the data, the code path and the
+results below describe the decision the desk made on 15 June 2026 and what happened
+in the month after it.
 
 ## The question
 
@@ -108,6 +108,49 @@ sanity check, not as evidence of an edge.
 TSMOM put about 70% into ONTO, DBB, SIVR, UEC and SGLD.L, the names with the
 strongest trends. AVB and VRTX had negative momentum and sat at the 2% floor.
 
+## The first month: 15 June to 15 July 2026
+
+The June weights were held without trading until 15 July.
+
+| Strategy | Return | Versus SPY | Worst contributor |
+| --- | --- | --- | --- |
+| TSMOM | -8.59% | -8.84% | SIVR -2.59% |
+| Equal weight | -5.74% | -6.00% | SIVR -1.77% |
+| Inverse volatility | -3.20% | -3.46% | SIVR -1.07% |
+| Momentum only | -10.29% | -10.54% | SIVR -3.21% |
+| SPY | +0.25% | | |
+
+![First month](results/figures/first_month.png)
+
+It was a bad month for the allocation. The basket fell while the S&P 500 was flat,
+and TSMOM lost more than the simple rules because it was overweight the assets that
+had trended hardest: silver, uranium and ONTO all gave back part of their gains.
+This is the known weakness of momentum. When trends turn, it is positioned on the
+wrong side until the signal catches up, and a single month says little about
+whether the rule works. Full per-asset contributions are in
+`results/first_month_contributions.csv`.
+
+### Stand-in prices
+
+Two assets have no usable prices after 15 June on Yahoo Finance, so the first month
+uses close substitutes for them. The June weights are unchanged; only the
+first-month returns are borrowed.
+
+| Asset | Stand-in | Why |
+| --- | --- | --- |
+| AVB | ESS (Essex Property Trust) | Coastal apartment REIT, daily correlation 0.88 with AVB over the two years to June 15 |
+| SOYB.L | SOYB (Teucrium Soybean Fund) | Same commodity, US listing, weekly correlation 0.92 with SOYB.L |
+
+Together they were 8% of the TSMOM portfolio and added +0.44% to its first-month
+return. Had both been flat instead, TSMOM would still have lost about 9%.
+
+## Limitations
+
+- One basket, one month of live results. Nothing here is statistically significant.
+- The basket was chosen with hindsight, which flatters every backtest above.
+- No trading costs or taxes. TSMOM trades about 15% of the portfolio a month.
+- Yahoo adjusted closes; London ETCs converted at daily GBP/USD closes.
+
 ## Reproduce
 
 ```bash
@@ -115,6 +158,14 @@ pip install -r requirements-research.txt
 python -m research.run_study
 ```
 
-The script reads `data/prices.csv` (daily USD closes to 15 June 2026) and
-`data/risk_free.csv` (3-month Treasury yield from FRED, as a decimal), and rewrites
-everything in `results/`.
+The script reads only the frozen files in `data/` and rewrites everything in
+`results/`:
+
+| File | Contents |
+| --- | --- |
+| `data/prices.csv` | Daily USD closes to 15 June 2026, as used for the decision |
+| `data/risk_free.csv` | 3-month Treasury yield (FRED DGS3MO), as a decimal |
+| `data/first_month.csv` | Closes from 15 June to 15 July 2026, with the stand-ins and SPY |
+| `results/summary.md` | All tables above |
+| `results/*.csv` | Metrics, allocation, first-month values and contributions |
+| `results/figures/` | The four charts |
