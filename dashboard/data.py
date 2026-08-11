@@ -33,3 +33,48 @@ def currency_unit(code) -> tuple[str, float]:
     if not code:
         return "USD", 1.0
     return MINOR_UNITS.get(code, (str(code).upper(), 1.0))
+
+
+def _cache_path(name: str) -> str:
+    root = os.path.realpath(CACHE_DIR)
+    os.makedirs(root, exist_ok=True)
+    path = os.path.realpath(os.path.join(root, name))
+    if os.path.dirname(path) != root:
+        raise DataError(f"Invalid cache name: {name!r}")
+    return path
+
+
+def _fresh(path: str) -> bool:
+    return os.path.exists(path) and (time.time() - os.path.getmtime(path)) / 3600 < CACHE_TTL_HOURS
+
+
+def _download(tickers: list[str]) -> pd.DataFrame:
+    import yfinance as yf
+
+    raw = yf.download(tickers, period="max", auto_adjust=True, progress=False, threads=True, group_by="column")
+    if raw is None or raw.empty:
+        return pd.DataFrame()
+    close = raw["Close"]
+    if isinstance(close, pd.Series):
+        close = close.to_frame(tickers[0])
+    close.index = pd.to_datetime(close.index).tz_localize(None)
+    return close
+
+
+def _yahoo_prices(tickers: list[str]) -> pd.DataFrame:
+    frames, missing = [], []
+    for t in tickers:
+        path = _cache_path(f"{t}.csv")
+        if _fresh(path):
+            frames.append(pd.read_csv(path, index_col=0, parse_dates=True).iloc[:, 0].rename(t))
+        else:
+            missing.append(t)
+    if missing:
+        close = _download(missing)
+        for t in missing:
+            if t not in close.columns or close[t].dropna().empty:
+                raise DataError(f"No price history for {t}")
+            s = close[t].dropna()
+            s.to_csv(_cache_path(f"{t}.csv"), header=[t])
+            frames.append(s.rename(t))
+    return pd.concat(frames, axis=1).sort_index()
