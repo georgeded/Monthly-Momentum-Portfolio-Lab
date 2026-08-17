@@ -78,3 +78,16 @@ def _yahoo_prices(tickers: list[str]) -> pd.DataFrame:
             s.to_csv(_cache_path(f"{t}.csv"), header=[t])
             frames.append(s.rename(t))
     return pd.concat(frames, axis=1).sort_index()
+
+
+def _csv_prices(tickers: list[str]) -> pd.DataFrame:
+    df = pd.read_csv(PRICES_CSV, index_col=0, parse_dates=True).sort_index()
+    df.columns = [c.upper() for c in df.columns]
+    absent = [t for t in tickers if t not in df.columns]
+    if absent:
+        raise DataError(f"Not in {PRICES_CSV}: {', '.join(absent)}")
+    return df[tickers]
+
+
+def raw_prices(tickers: list[str]) -> pd.DataFrame:
+    return _csv_prices(tickers) if PRICES_CSV else _yahoo_prices(tickers)
