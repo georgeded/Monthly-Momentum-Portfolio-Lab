@@ -91,3 +91,16 @@ def _csv_prices(tickers: list[str]) -> pd.DataFrame:
 
 def raw_prices(tickers: list[str]) -> pd.DataFrame:
     return _csv_prices(tickers) if PRICES_CSV else _yahoo_prices(tickers)
+
+
+def check_stale(prices: pd.DataFrame) -> None:
+    """Fail on tickers that stopped trading, instead of cutting every series short."""
+    stale = []
+    for t in prices.columns:
+        last = prices[t].last_valid_index()
+        if last is None:
+            raise DataError(f"No price history for {t}")
+        if (prices.index > last).sum() > MAX_GAP_DAYS:
+            stale.append(f"{t} (last price {last:%Y-%m-%d})")
+    if stale:
+        raise DataError(f"No recent prices for {', '.join(stale)}. Remove them or check the symbols.")
