@@ -104,3 +104,50 @@ def check_stale(prices: pd.DataFrame) -> None:
             stale.append(f"{t} (last price {last:%Y-%m-%d})")
     if stale:
         raise DataError(f"No recent prices for {', '.join(stale)}. Remove them or check the symbols.")
+
+
+def load_prices(tickers: list[str], base: str = "USD") -> pd.DataFrame:
+    """Daily prices in the base currency, one column per ticker, on the union of trading days."""
+    tickers = list(dict.fromkeys(normalize_ticker(t) for t in tickers))
+    units = {t: currency_unit(ticker_info(t)["currency"]) for t in tickers}
+    pairs = sorted({f"{c}{base}=X" for c, _ in units.values() if c != base})
+    prices = raw_prices(tickers + pairs)
+    check_stale(prices[tickers])
+    prices = prices.ffill(limit=MAX_GAP_DAYS)
+    out = {}
+    for t, (currency, scale) in units.items():
+        fx = 1.0 if currency == base else prices[f"{currency}{base}=X"]
+        out[t] = prices[t] * scale * fx
+    return pd.DataFrame(out).dropna(how="all")
+
+
+def ticker_info(ticker: str) -> dict:
+    """Name and quote currency from Yahoo, cached. Incomplete answers are retried after an hour."""
+    ticker = normalize_ticker(ticker)
+    path = _cache_path("info.json")
+    store = {}
+    if os.path.exists(path):
+        with open(path) as f:
+            store = json.load(f)
+    cached = store.get(ticker)
+    if cached and (cached["complete"] or time.time() - cached["fetched"] < 3600):
+        return {k: cached[k] for k in ("name", "sector", "currency")}
+
+    entry = {"name": ticker, "sector": None, "currency": None}
+    if PRICES_CSV:
+        return entry
+    try:
+        import yfinance as yf
+
+        info = yf.Ticker(ticker).info or {}
+    except Exception:
+        info = {}
+    if not info.get("longName") and not info.get("shortName"):
+        return {k: cached[k] for k in ("name", "sector", "currency")} if cached else entry
+    entry = {"name": info.get("longName") or info.get("shortName"), "sector": info.get("sector"),
+             "currency": info.get("currency")}
+    store[ticker] = {**entry, "complete": bool(entry["sector"]) or info.get("quoteType") in NO_SECTOR_TYPES,
+                     "fetched": time.time()}
+    with open(path, "w") as f:
+        json.dump(store, f, indent=1)
+    return entry
