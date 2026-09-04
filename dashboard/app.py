@@ -77,3 +77,63 @@ def lookup(ticker: str):
     currency, scale = data.currency_unit(info["currency"])
     return {"ticker": ticker, "name": info["name"], "currency": currency,
             "last_price": float(prices.iloc[-1] * scale), "first_date": prices.index[0].strftime("%Y-%m-%d")}
+
+
+@app.post("/api/backtest")
+def backtest(req: BacktestRequest):
+    unknown = [s for s in req.strategies if s not in STRATEGIES]
+    if unknown or not req.strategies:
+        raise HTTPException(400, f"Unknown strategies: {', '.join(unknown)}" if unknown else "Pick at least one strategy")
+    if req.settings.skip_months >= req.settings.lookback_months:
+        raise HTTPException(400, "Skip months must be shorter than the lookback")
+    if req.end and req.end <= req.start:
+        raise HTTPException(400, "End date must be after the start date")
+    try:
+        tickers = list(dict.fromkeys(data.normalize_ticker(t) for t in req.tickers))
+        prices = data.load_prices(tickers, req.base_currency)
+    except data.DataError as e:
+        raise HTTPException(400, str(e))
+
+    start, end = pd.Timestamp(req.start), pd.Timestamp(req.end or prices.index.max())
+    if start > prices.index.max():
+        raise HTTPException(400, f"Start date is after the latest price ({prices.index.max():%Y-%m-%d})")
+    params = Params(lookback_months=req.settings.lookback_months, skip_months=req.settings.skip_months,
+                    vol_window=req.settings.vol_window, vol_min_periods=max(2, req.settings.vol_window // 2),
+                    min_weight=req.settings.min_weight, max_weight=req.settings.max_weight)
+    day = start.day if req.rebalance == "start_day" else None
+    cash = cash_returns_from_rate(prices.index, req.cash_rate)
+    history = req.settings.lookback_months + 1
+
+    results = {}
+    for name in req.strategies:
+        try:
+            res = run(name, prices.loc[:end], start, end, day, params, cash, min_history_months=history)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        summary = {k: _clean(v) for k, v in metrics.summarize(res, req.cash_rate).items()}
+        current = res.weights.iloc[-1]
+        results[name] = {
+            "name": LABELS[name],
+            "metrics": summary,
+            "value": {"dates": _dates(res.value.index), "values": [_clean(v) for v in res.value]},
+            "drawdown": [_clean(v) for v in metrics.drawdown(res.value)],
+            "weights": {"dates": _dates(res.weights.index), "assets": tickers + [CASH],
+                        "rows": [[_clean(v) for v in row] for row in res.weights[tickers + [CASH]].values]},
+            "current": {"date": res.weights.index[-1].strftime("%Y-%m-%d"),
+                        "weights": {a: _clean(current[a]) for a in tickers + [CASH]}},
+            "turnover": {"dates": _dates(res.turnover.index), "values": [_clean(v) for v in res.turnover]},
+        }
+
+    first = next(iter(results.values()))
+    late = [t for t in tickers if prices[t].first_valid_index() > start - pd.DateOffset(months=history)]
+    return {
+        "window": {"start": first["weights"]["dates"][0], "end": first["value"]["dates"][-1],
+                   "rebalances": len(first["weights"]["dates"]),
+                   "schedule": f"day {day} of each month" if day else "last trading day of each month"},
+        "base_currency": req.base_currency,
+        "assets": [{"ticker": t, "name": data.ticker_info(t)["name"],
+                    "first_date": prices[t].first_valid_index().strftime("%Y-%m-%d")} for t in tickers],
+        "notes": [f"{t} has less than {history} months of history at the start, so it joins once it has enough."
+                  for t in late],
+        "strategies": results,
+    }
