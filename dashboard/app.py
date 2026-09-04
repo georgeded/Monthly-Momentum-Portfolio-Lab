@@ -56,3 +56,24 @@ def health():
 @app.get("/api/strategies")
 def strategies():
     return {"strategies": [{"id": k, "name": LABELS[k]} for k in STRATEGIES], "defaults": ModelSettings().model_dump()}
+
+
+@app.get("/api/search")
+def search(q: str = Query(..., min_length=1, max_length=40)):
+    return {"results": data.search(q)}
+
+
+@app.get("/api/lookup/{ticker}")
+def lookup(ticker: str):
+    try:
+        ticker = data.normalize_ticker(ticker)
+    except data.DataError as e:
+        raise HTTPException(400, str(e))
+    try:
+        prices = data.raw_prices([ticker])[ticker].dropna()
+    except data.DataError as e:
+        raise HTTPException(404, str(e))
+    info = data.ticker_info(ticker)
+    currency, scale = data.currency_unit(info["currency"])
+    return {"ticker": ticker, "name": info["name"], "currency": currency,
+            "last_price": float(prices.iloc[-1] * scale), "first_date": prices.index[0].strftime("%Y-%m-%d")}
