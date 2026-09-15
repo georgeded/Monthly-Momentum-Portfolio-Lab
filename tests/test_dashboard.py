@@ -43,3 +43,7 @@ def test_lookup_and_search():
     assert client.get("/api/lookup/aaa").json()["ticker"] == "AAA"
     assert client.get("/api/lookup/bad$").status_code == 400
     assert [x["ticker"] for x in client.get("/api/search?q=bb").json()["results"]] == ["BBB"]
+
+
+def test_frontend_served():
+    assert "Allocation dashboard" in client.get("/").text

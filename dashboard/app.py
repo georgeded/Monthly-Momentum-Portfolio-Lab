@@ -137,3 +137,11 @@ def backtest(req: BacktestRequest):
                   for t in late],
         "strategies": results,
     }
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(os.path.join(FRONTEND, "index.html"))
+
+
+app.mount("/static", StaticFiles(directory=FRONTEND), name="static")

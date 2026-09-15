@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Momentum Allocation Dashboard</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dashboard.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="rd-shell">
+  <div class="rd-topbar">
+    <div class="rd-brand">Momentum allocation</div>
+    <a href="/docs" target="_blank" rel="noopener">API reference</a>
+  </div>
+
+  <div class="rd-card">
+    <div class="rd-head">
+      <div>
+        <h1 class="rd-h">Allocation dashboard</h1>
+        <p class="rd-sub" style="margin-bottom:0;">Pick a basket and a start date, then compare how four monthly allocation rules would have weighted it and performed. <span class="rd-muted">Educational, not investment advice.</span></p>
+      </div>
+      <div class="rd-head-right">
+        <span class="rd-pill rd-pill--grey" id="rd-window">-</span>
+        <span class="rd-pill rd-pill--grey" id="rd-schedule">-</span>
+      </div>
+    </div>
+    <form class="rd-form" id="rd-form">
+      <div class="rd-field rd-field--wide">
+        <div class="rd-book__bar">
+          <label>Assets</label>
+          <select id="rd-preset" aria-label="Load a sample basket">
+            <option value="">Load a sample basket</option>
+          </select>
+        </div>
+        <div class="rd-table-wrap">
+          <table class="rd-book rd-book--assets">
+            <thead><tr><th>Ticker</th><th>Name</th><th>History from</th><th></th></tr></thead>
+            <tbody id="rd-book-rows"></tbody>
+          </table>
+        </div>
+        <div class="rd-book__add">
+          <input id="rd-add" list="rd-suggest" placeholder="Search a company or ticker, e.g. SIVR" autocomplete="off" spellcheck="false">
+          <datalist id="rd-suggest"></datalist>
+          <button type="button" class="rd-btn rd-btn--outline" id="rd-add-btn">Add</button>
+        </div>
+        <div class="rd-hint" id="rd-book-note"></div>
+      </div>
+      <div class="rd-field">
+        <label for="rd-start">Start rebalancing</label>
+        <input id="rd-start" type="date" required>
+      </div>
+      <div class="rd-field">
+        <label for="rd-rebalance">Rebalance on</label>
+        <select id="rd-rebalance">
+          <option value="start_day" selected>Same day each month</option>
+          <option value="month_end">Last trading day of the month</option>
+        </select>
+      </div>
+      <div class="rd-field">
+        <label for="rd-currency">Base currency</label>
+        <select id="rd-currency">
+          <option value="USD" selected>USD</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+        </select>
+      </div>
+      <div class="rd-field">
+        <label for="rd-cash">Cash rate <span class="rd-optional">(% a year)</span></label>
+        <input id="rd-cash" type="number" min="0" max="20" step="0.1" value="4">
+      </div>
+      <div class="rd-field">
+        <button class="rd-btn rd-btn--primary" type="submit" id="rd-run">Run</button>
+      </div>
+      <details class="rd-field rd-field--wide rd-settings">
+        <summary>Model settings</summary>
+        <div class="rd-settings__grid">
+          <div class="rd-field"><label for="rd-lookback">Momentum lookback <span class="rd-optional">(months)</span></label><input id="rd-lookback" type="number" min="2" max="24" step="1" value="12"></div>
+          <div class="rd-field"><label for="rd-skip">Skip latest <span class="rd-optional">(months)</span></label><input id="rd-skip" type="number" min="0" max="3" step="1" value="1"></div>
+          <div class="rd-field"><label for="rd-volwin">Volatility window <span class="rd-optional">(days)</span></label><input id="rd-volwin" type="number" min="21" max="756" step="1" value="252"></div>
+          <div class="rd-field"><label for="rd-min">Minimum weight <span class="rd-optional">(%)</span></label><input id="rd-min" type="number" min="0" max="20" step="0.5" value="2"></div>
+          <div class="rd-field"><label for="rd-max">TSMOM cap <span class="rd-optional">(%)</span></label><input id="rd-max" type="number" min="1" max="100" step="1" value="30"></div>
+        </div>
+        <div class="rd-strategies" id="rd-strategies"></div>
+        <div class="rd-hint">Every rule gives each asset the minimum weight. Only TSMOM is capped; the other three are reference rules.</div>
+      </details>
+    </form>
+    <div class="rd-error" id="rd-error"></div>
+  </div>
+
+  <div id="rd-body" class="rd-loading">
+    <div class="rd-card">
+      <h2 class="rd-h2">Strategy comparison</h2>
+      <p class="rd-sub rd-sub--tight">Annualized from the monthly holding periods. Max drawdown uses daily values. Turnover is one-way, after the first rebalance.</p>
+      <div class="rd-table-wrap">
+        <table class="rd-table rd-table--cards" id="rd-metrics">
+          <thead><tr><th>Strategy</th><th>Total return</th><th>Annual return</th><th>Volatility</th><th>Sharpe</th><th>Sortino</th><th>Max drawdown</th><th>Turnover</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="rd-notes" id="rd-notes"></div>
+    </div>
+
+    <div class="rd-card">
+      <h2 class="rd-h2">Growth and drawdown</h2>
+      <p class="rd-sub rd-sub--tight">Growth of 1 from the first rebalance, then how far each rule sits below its previous high.</p>
+      <div class="rd-chart" style="height:280px;"><canvas id="rd-growth"></canvas></div>
+      <div class="rd-legend" id="rd-growth-legend"></div>
+      <div class="rd-chart" style="height:150px; margin-top:12px;"><canvas id="rd-drawdown"></canvas></div>
+    </div>
+
+    <div class="rd-card">
+      <h2 class="rd-h2">Current allocation</h2>
+      <p class="rd-sub rd-sub--tight">Weights set at the latest rebalance, <span id="rd-current-date">-</span>.</p>
+      <div class="rd-table-wrap">
+        <table class="rd-alloc" id="rd-alloc"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="rd-card">
+      <div class="rd-head">
+        <div>
+          <h2 class="rd-h2">Weights over time</h2>
+          <p class="rd-sub rd-sub--tight">Target weights at every rebalance. Cash appears when no asset is eligible or the cap cannot be met.</p>
+        </div>
+        <button type="button" class="rd-btn rd-btn--outline" id="rd-download">Download CSV</button>
+      </div>
+      <div class="rd-seg rd-seg--tabs" id="rd-tabs" role="tablist"></div>
+      <div class="rd-chart" style="height:320px; margin-top:12px;"><canvas id="rd-weights"></canvas></div>
+    </div>
+  </div>
+
+  <p class="rd-foot">Prices from Yahoo Finance, adjusted for dividends and splits. The strategies are described in the repository README.</p>
+</div>
+<script src="/static/dashboard.js"></script>
+<script>
+  MomentumDashboard.init({ apiBase: '' })
+</script>
+</body>
+</html>
