@@ -207,5 +207,49 @@ var MomentumDashboard = (function () {
     el('rd-body').classList.remove('rd-loading')
   }
 
-  return { render: render }
+  function downloadCsv() {
+    if (!state.result) return
+    var s = state.result.strategies[state.tab]
+    var lines = ['rebalance_date,' + s.weights.assets.join(',')].concat(s.weights.dates.map(function (d, i) {
+      return d + ',' + s.weights.rows[i].map(function (v) { return v === null ? '' : v }).join(',')
+    }))
+    var link = document.createElement('a')
+    link.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }))
+    link.download = state.tab + '_weights.csv'
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
+  function showError(msg) {
+    var box = el('rd-error')
+    box.textContent = msg
+    box.classList.toggle('show', !!msg)
+  }
+
+  function load(request) {
+    el('rd-body').classList.add('rd-loading')
+    el('rd-run').disabled = true
+    showError('')
+    return fetch(state.apiBase + '/api/backtest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    }).then(function (res) {
+      return res.json().then(function (body) {
+        if (!res.ok) throw new Error(typeof body.detail === 'string' ? body.detail : body.detail.map(function (d) { return d.msg }).join('; '))
+        return body
+      })
+    }).then(function (result) {
+      render(result)
+      return result
+    }).catch(function (err) {
+      showError(err.message)
+      el('rd-body').classList.remove('rd-loading')
+      throw err
+    }).finally(function () {
+      el('rd-run').disabled = false
+    })
+  }
+
+  return { load: load, render: render }
 })()
