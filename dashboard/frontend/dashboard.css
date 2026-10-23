@@ -79,3 +79,13 @@ body { margin: 0; background: #fff; color: var(--rd-ink); font-family: var(--rd-
 .rd-notes { margin-top: 10px; }
 .rd-note { font-size: 0.8rem; color: var(--rd-grey); padding: 8px 12px; border-radius: 11px; background: var(--rd-tile); border: 1px solid var(--rd-line); margin-top: 6px; }
 .rd-book__since { color: var(--rd-grey); font-size: 0.8rem; white-space: nowrap; }
+.rd-settings { border-top: 1px solid var(--rd-line); padding-top: 12px; }
+.rd-settings summary { cursor: pointer; font-size: 0.82rem; font-weight: 700; color: var(--rd-red); list-style: none; }
+.rd-settings summary::-webkit-details-marker { display: none; }
+.rd-settings summary::after { content: ' +'; }
+.rd-settings[open] summary::after { content: ' -'; }
+.rd-settings__grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 12px; }
+.rd-strategies { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; }
+.rd-field .rd-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 700; color: var(--rd-ink); text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; }
+.rd-field .rd-check input { width: auto; margin: 0; accent-color: var(--rd-red); }
+.rd-check .rd-dot { margin: 0; }
