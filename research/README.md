@@ -2,7 +2,8 @@
 
 This folder is the research record. It is frozen: the data, the code path and the
 results below describe the decision the desk made on 15 June 2026 and what happened
-in the month after it.
+in the month after it. The interactive dashboard in `dashboard/` is a separate tool
+and does not read anything from here.
 
 ## The question
 
@@ -55,7 +56,7 @@ We compared it against three simpler rules on the same basket:
 - **Inverse volatility**: weight proportional to 1 / volatility, with the 2% floor.
 - **Momentum only**: the TSMOM score without the volatility scaling or the cap.
 
-The code is in `momentum/` at the repository root.
+The code is in `momentum/` at the repository root and is shared with the dashboard.
 
 ## Backtest before the decision
 
