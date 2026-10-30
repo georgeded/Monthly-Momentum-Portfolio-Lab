@@ -388,6 +388,7 @@ var MomentumDashboard = (function () {
       if (preset.value === '') return
       basket = presetBasket(Number(preset.value))
       renderBasket()
+      submit()
     })
   }
 
