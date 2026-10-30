@@ -1,9 +1,13 @@
 # Monthly Momentum Portfolio Lab
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/api-FastAPI-009688?logo=fastapi&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+[![Live demo](https://img.shields.io/badge/demo-live-ae1f19?logo=render&logoColor=white)](https://momentum-allocation-dashboard.onrender.com)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](.python-version)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)](dashboard/app.py)
+[![pandas](https://img.shields.io/badge/pandas-2.x-150458?logo=pandas&logoColor=white)](requirements.txt)
+[![Chart.js](https://img.shields.io/badge/Chart.js-4-FF6384?logo=chartdotjs&logoColor=white)](dashboard/frontend/dashboard.js)
+[![Data](https://img.shields.io/badge/data-Yahoo%20Finance-6001D2)](dashboard/data.py)
+[![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](tests)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A rule-based monthly allocation for a basket picked by analysts, in two parts:
 
@@ -14,6 +18,11 @@ A rule-based monthly allocation for a basket picked by analysts, in two parts:
   date, and shows the weights and performance of each one.
 
 Both use the same allocation code in `momentum/`.
+
+**Live dashboard:** https://momentum-allocation-dashboard.onrender.com
+(API reference at [/docs](https://momentum-allocation-dashboard.onrender.com/docs)).
+It runs on a free instance, so the first request after a quiet period takes
+about a minute.
 
 Educational project. Not investment advice.
 
@@ -51,14 +60,15 @@ pip install -r requirements.txt
 uvicorn dashboard.app:app --reload
 ```
 
-Open http://127.0.0.1:8000. You can:
+Open http://127.0.0.1:8000, or use the live dashboard above. You can:
 
 - build a basket by searching Yahoo Finance or loading a sample basket,
 - choose the date of the first rebalance, and rebalance on that day of each month
   or on the last trading day,
-- choose the base currency, cash rate and model settings,
+- choose the base currency, the risk-free rate and the model settings,
 - compare the strategies' returns, risk, drawdowns and turnover,
-- see the latest weights and every past rebalance, and download them as CSV.
+- see the latest weights and every past rebalance, and download them as CSV,
+- switch between light and dark mode.
 
 Prices are cached in `cache/` for 12 hours. The API is documented at `/docs`.
 
@@ -68,11 +78,13 @@ Prices are cached in `cache/` for 12 hours. The API is documented at `/docs`.
 | `CACHE_TTL_HOURS` | `12` | How long cached prices are reused |
 | `PRICES_CSV` | unset | Read prices from a local CSV instead of Yahoo |
 
+The risk-free rate is what uninvested cash earns. It is also the return that
+Sharpe and Sortino are measured against.
+
 ### Deploy on Render
 
 The repository includes `render.yaml`. In Render choose **New > Blueprint**,
-connect this repository and apply. The free plan sleeps when idle, so the first
-request after a break takes about a minute.
+connect this repository and apply.
 
 ## Layout
 
