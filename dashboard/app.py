@@ -5,7 +5,7 @@ from typing import Literal
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,11 @@ MAX_ASSETS = 25
 
 app = FastAPI(title="Momentum Allocation Dashboard", version="1.0.0",
               description="Run the monthly momentum strategies on any basket from any start date.")
+
+
+@app.exception_handler(Exception)
+def unexpected_error(request, exc):
+    return JSONResponse(status_code=500, content={"detail": "The server hit an unexpected error. Please run it again."})
 
 
 class ModelSettings(BaseModel):
@@ -35,7 +40,7 @@ class BacktestRequest(BaseModel):
     end: date | None = None
     rebalance: Literal["start_day", "month_end"] = "start_day"
     base_currency: str = Field("USD", pattern=r"^[A-Z]{3}$")
-    cash_rate: float = Field(0.04, ge=0, le=0.2, description="Annual return on uninvested cash")
+    cash_rate: float = Field(0.04, ge=0, le=0.2, description="Annual risk-free rate, earned on uninvested cash and used for Sharpe and Sortino")
     settings: ModelSettings = ModelSettings()
     strategies: list[str] = list(STRATEGIES)
 

@@ -1,7 +1,11 @@
 // Draws the backtest returned by POST /api/backtest. All numbers come from the API.
 var MomentumDashboard = (function () {
   var C = { red: '#ae1f19', grey: '#9ca3af', greyDark: '#6b7280', ink: '#111827', line: '#eef0f2', green: '#16a34a', danger: '#dc2626' }
+  C.tip = '#111827'
+  var LIGHT = Object.assign({}, C)
+  var DARK = { red: '#e0483f', ink: '#e5e7eb', line: '#262a31', grey: '#6b7280', greyDark: '#9ca3af', neutral: '#2b2f36', tip: '#374151' }
   var STRATEGY_COLORS = { tsmom: '#ae1f19', equal_weight: '#6b7280', inverse_vol: '#2a78d6', momentum_only: '#f59e0b' }
+  var STRATEGY_NAMES = { tsmom: 'TSMOM', equal_weight: 'Equal weight', inverse_vol: 'Inverse volatility', momentum_only: 'Momentum only' }
   var ASSET_COLORS = ['#ae1f19', '#2a78d6', '#f59e0b', '#16a34a', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#ea580c', '#475569',
     '#e11d48', '#0d9488', '#a16207', '#4f46e5', '#be123c', '#15803d', '#c2410c', '#1d4ed8', '#9333ea', '#0f766e']
   var PRESETS = [
@@ -44,7 +48,7 @@ var MomentumDashboard = (function () {
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 250 },
-      plugins: { legend: { display: false }, tooltip: { backgroundColor: C.ink, titleFont: { weight: '700' }, padding: 10, cornerRadius: 8 } },
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: C.tip, titleFont: { weight: '700' }, padding: 10, cornerRadius: 8 } },
       scales: {
         x: { grid: { color: C.line, lineWidth: 1, drawTicks: false }, border: { display: false }, ticks: { color: C.greyDark, font: { size: 11 } } },
         y: { grid: { color: C.line, lineWidth: 1, drawTicks: false }, border: { display: false }, ticks: { color: C.greyDark, font: { size: 11 } } }
@@ -220,6 +224,21 @@ var MomentumDashboard = (function () {
     URL.revokeObjectURL(link.href)
   }
 
+  // Errors arrive as JSON from the API, but as plain text or HTML from the host while it starts up.
+  function readJson(res) {
+    return res.text().then(function (text) {
+      var body
+      try { body = JSON.parse(text) } catch (e) { body = null }
+      if (!res.ok) {
+        var detail = body && body.detail
+        if (Array.isArray(detail)) detail = detail.map(function (d) { return d.msg }).join('; ')
+        throw new Error(detail || (res.status >= 502 ? 'The server is starting up. Try again in a minute.' : 'Request failed (HTTP ' + res.status + ').'))
+      }
+      if (!body) throw new Error('Unexpected response from the server.')
+      return body
+    })
+  }
+
   function showError(msg) {
     var box = el('rd-error')
     box.textContent = msg
@@ -235,16 +254,13 @@ var MomentumDashboard = (function () {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
     }).then(function (res) {
-      return res.json().then(function (body) {
-        if (!res.ok) throw new Error(typeof body.detail === 'string' ? body.detail : body.detail.map(function (d) { return d.msg }).join('; '))
-        return body
-      })
+      return readJson(res)
     }).then(function (result) {
       render(result)
       return result
     }).catch(function (err) {
+      // Leave the previous results dimmed so they are not mistaken for this basket.
       showError(err.message)
-      el('rd-body').classList.remove('rd-loading')
       throw err
     }).finally(function () {
       el('rd-run').disabled = false
@@ -270,8 +286,11 @@ var MomentumDashboard = (function () {
     if (!ticker || lookups[ticker]) return
     lookups[ticker] = { status: 'checking' }
     fetch(state.apiBase + '/api/lookup/' + encodeURIComponent(ticker)).then(function (res) {
-      return res.json().then(function (body) {
-        lookups[ticker] = res.ok ? { status: 'ok', info: body } : { status: 'missing' }
+      return readJson(res).then(function (body) {
+        lookups[ticker] = { status: 'ok', info: body }
+      }, function (err) {
+        if (res.status >= 500) throw err
+        lookups[ticker] = { status: 'missing' }
       })
     }).catch(function () { delete lookups[ticker] }).finally(updateBasket)
   }
@@ -417,7 +436,18 @@ var MomentumDashboard = (function () {
     }
   }
 
+  function useTheme(name, save) {
+    document.documentElement.dataset.theme = name
+    Object.assign(C, LIGHT, name === 'dark' ? DARK : {})
+    if (save) try { localStorage.setItem('rd-theme', name) } catch (e) {}
+  }
+
   function init(opts) {
+    useTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
+    el('rd-theme').addEventListener('click', function () {
+      useTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark', true)
+      if (state.result) render(state.result)
+    })
     state.apiBase = (opts && opts.apiBase) || ''
     el('rd-start').value = defaultStart()
     el('rd-start').max = new Date().toISOString().slice(0, 10)
@@ -436,8 +466,12 @@ var MomentumDashboard = (function () {
       e.preventDefault()
       submit()
     })
-    fetch(state.apiBase + '/api/strategies').then(function (res) { return res.json() }).then(function (body) {
-      wireStrategies(body.strategies)
+    fetch(state.apiBase + '/api/strategies').then(readJson).then(function (body) {
+      return body.strategies
+    }, function () {
+      return Object.keys(STRATEGY_COLORS).map(function (id) { return { id: id, name: STRATEGY_NAMES[id] } })
+    }).then(function (list) {
+      wireStrategies(list)
       submit()
     })
   }
