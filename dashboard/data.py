@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import threading
 import time
 
 import pandas as pd
@@ -15,6 +16,9 @@ TICKER_PATTERN = re.compile(r"^[A-Z0-9^][A-Z0-9.\-=^]{0,19}$")
 MINOR_UNITS = {"GBp": ("GBP", 0.01), "GBX": ("GBP", 0.01), "ZAc": ("ZAR", 0.01), "ILA": ("ILS", 0.01)}
 NO_SECTOR_TYPES = {"ETF", "INDEX", "MUTUALFUND", "CURRENCY", "CRYPTOCURRENCY"}
 SEARCH_TYPES = {"EQUITY", "ETF", "INDEX", "MUTUALFUND"}
+_info_lock = threading.Lock()
+# yfinance keeps download results in module globals, so overlapping downloads can mix them up.
+_download_lock = threading.Lock()
 
 
 class DataError(Exception):
@@ -44,6 +48,13 @@ def _cache_path(name: str) -> str:
     return path
 
 
+def _write_atomic(path: str, write) -> None:
+    # Write to a temporary file and swap it in, so readers never see half a file.
+    tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+    write(tmp)
+    os.replace(tmp, path)
+
+
 def _fresh(path: str) -> bool:
     return os.path.exists(path) and (time.time() - os.path.getmtime(path)) / 3600 < CACHE_TTL_HOURS
 
@@ -51,7 +62,8 @@ def _fresh(path: str) -> bool:
 def _download(tickers: list[str]) -> pd.DataFrame:
     import yfinance as yf
 
-    raw = yf.download(tickers, period="max", auto_adjust=True, progress=False, threads=True, group_by="column")
+    with _download_lock:
+        raw = yf.download(tickers, period="max", auto_adjust=True, progress=False, threads=True, group_by="column")
     if raw is None or raw.empty:
         return pd.DataFrame()
     close = raw["Close"]
@@ -61,21 +73,30 @@ def _download(tickers: list[str]) -> pd.DataFrame:
     return close
 
 
+def _read_cached(path: str) -> pd.Series | None:
+    if not _fresh(path):
+        return None
+    try:
+        return pd.read_csv(path, index_col=0, parse_dates=True).iloc[:, 0]
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def _yahoo_prices(tickers: list[str]) -> pd.DataFrame:
     frames, missing = [], []
     for t in tickers:
-        path = _cache_path(f"{t}.csv")
-        if _fresh(path):
-            frames.append(pd.read_csv(path, index_col=0, parse_dates=True).iloc[:, 0].rename(t))
-        else:
+        cached = _read_cached(_cache_path(f"{t}.csv"))
+        if cached is None:
             missing.append(t)
+        else:
+            frames.append(cached.rename(t))
     if missing:
         close = _download(missing)
         for t in missing:
             if t not in close.columns or close[t].dropna().empty:
                 raise DataError(f"No price history for {t}")
             s = close[t].dropna()
-            s.to_csv(_cache_path(f"{t}.csv"), header=[t])
+            _write_atomic(_cache_path(f"{t}.csv"), lambda tmp: s.to_csv(tmp, header=[t]))
             frames.append(s.rename(t))
     return pd.concat(frames, axis=1).sort_index()
 
@@ -121,15 +142,25 @@ def load_prices(tickers: list[str], base: str = "USD") -> pd.DataFrame:
     return pd.DataFrame(out).dropna(how="all")
 
 
+def _read_store(path: str) -> dict:
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _dump_json(store: dict, path: str) -> None:
+    with open(path, "w") as f:
+        json.dump(store, f, indent=1)
+
+
 def ticker_info(ticker: str) -> dict:
     """Name and quote currency from Yahoo, cached. Incomplete answers are retried after an hour."""
     ticker = normalize_ticker(ticker)
     path = _cache_path("info.json")
-    store = {}
-    if os.path.exists(path):
-        with open(path) as f:
-            store = json.load(f)
-    cached = store.get(ticker)
+    with _info_lock:
+        cached = _read_store(path).get(ticker)
     if cached and (cached["complete"] or time.time() - cached["fetched"] < 3600):
         return {k: cached[k] for k in ("name", "sector", "currency")}
 
@@ -146,10 +177,11 @@ def ticker_info(ticker: str) -> dict:
         return {k: cached[k] for k in ("name", "sector", "currency")} if cached else entry
     entry = {"name": info.get("longName") or info.get("shortName"), "sector": info.get("sector"),
              "currency": info.get("currency")}
-    store[ticker] = {**entry, "complete": bool(entry["sector"]) or info.get("quoteType") in NO_SECTOR_TYPES,
-                     "fetched": time.time()}
-    with open(path, "w") as f:
-        json.dump(store, f, indent=1)
+    with _info_lock:
+        store = _read_store(path)
+        store[ticker] = {**entry, "complete": bool(entry["sector"]) or info.get("quoteType") in NO_SECTOR_TYPES,
+                         "fetched": time.time()}
+        _write_atomic(path, lambda tmp: _dump_json(store, tmp))
     return entry
 
 
